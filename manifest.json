@@ -1,0 +1,20 @@
+{
+  "name": "Chamariz",
+  "short_name": "Chamariz",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#2196F3",
+  "icons": [
+    {
+      "src": "icons/app-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/app-icon-large.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+} 

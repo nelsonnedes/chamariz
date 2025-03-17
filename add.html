@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Adicionar Áudio - Chamariz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--background-color);
+            padding: 20px;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--card-background);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-button {
+            font-size: 24px;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 10px;
+            transition: transform 0.2s;
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .add-form {
+            background: var(--card-background);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 600px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .file-input-container {
+            margin: 20px 0;
+        }
+
+        .file-input-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            margin-top: 5px;
+            background: var(--background-color);
+            transition: all 0.3s;
+        }
+
+        .file-input:hover {
+            border-color: var(--primary-color);
+        }
+
+        .preview-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .preview-audio {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .add-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .add-button:hover {
+            background-color: #1976D2;
+        }
+
+        .add-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .status-message.success {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .status-message.error {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="back-button" onclick="window.location.href='index.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <div class="header">Adicionar Novo Áudio</div>
+        <div style="width: 44px;"></div>
+    </div>
+
+    <div class="add-form">
+        <div class="file-input-container">
+            <label class="file-input-label">Arquivo de Áudio (M4A)</label>
+            <input type="file" class="file-input" id="audioFile" accept=".m4a" onchange="handleAudioFile(this)">
+            <div class="preview-container">
+                <audio class="preview-audio" id="audioPreview" controls></audio>
+            </div>
+        </div>
+
+        <div class="file-input-container">
+            <label class="file-input-label">Imagem do Áudio (JPEG/JPG)</label>
+            <input type="file" class="file-input" id="imageFile" accept=".jpg,.jpeg" onchange="handleImageFile(this)">
+            <div class="preview-container">
+                <img class="preview-image" id="imagePreview" alt="Preview">
+            </div>
+        </div>
+
+        <button class="add-button" onclick="addNewAudio()" id="addButton" disabled>
+            Adicionar Áudio
+        </button>
+
+        <div class="status-message" id="statusMessage"></div>
+    </div>
+
+    <script>
+        let newAudioFile = null;
+        let newImageFile = null;
+
+        function handleAudioFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            newAudioFile = file;
+            const preview = document.getElementById('audioPreview');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateAddButton();
+        }
+
+        function handleImageFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            newImageFile = file;
+            const preview = document.getElementById('imagePreview');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateAddButton();
+        }
+
+        function updateAddButton() {
+            const addButton = document.getElementById('addButton');
+            addButton.disabled = !(newAudioFile && newImageFile);
+        }
+
+        function showStatus(message, isError = false) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = 'status-message ' + (isError ? 'error' : 'success');
+            statusElement.style.display = 'block';
+        }
+
+        async function addNewAudio() {
+            if (!newAudioFile || !newImageFile) {
+                showStatus('Por favor, selecione um arquivo de áudio e uma imagem.', true);
+                return;
+            }
+
+            const addButton = document.getElementById('addButton');
+            addButton.disabled = true;
+            addButton.textContent = 'Adicionando...';
+
+            try {
+                const audioName = newAudioFile.name.replace('.m4a', '');
+                const audioPath = `Audios/${newAudioFile.name}`;
+                const imagePath = `icons/${newImageFile.name}`;
+
+                // Criar o novo card no formato correto
+                const newCard = {
+                    audio: audioPath,
+                    image: imagePath,
+                    name: audioName,
+                    html: `
+                    <div class="audio-card" data-name="${audioName}">
+                        <div class="audio-header">
+                            <img src="${imagePath}" alt="${audioName}" class="audio-icon">
+                            <div class="audio-title">${audioName}</div>
+                        </div>
+                        <audio class="audio-controls" controls src="${audioPath}"></audio>
+                        <div class="loop-controls">
+                            <input type="number" class="time-input" placeholder="Início (seg)" min="0" step="0.1">
+                            <input type="number" class="time-input" placeholder="Fim (seg)" min="0" step="0.1">
+                            <button class="loop-button">Loop</button>
+                        </div>
+                    </div>`
+                };
+
+                // Carregar cards existentes ou criar array vazio
+                let cards = JSON.parse(localStorage.getItem('audioCards') || '[]');
+                
+                // Adicionar novo card
+                cards.push(newCard);
+                
+                // Salvar no localStorage
+                localStorage.setItem('audioCards', JSON.stringify(cards));
+
+                showStatus('Áudio adicionado com sucesso!');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+
+            } catch (error) {
+                console.error('Erro ao adicionar áudio:', error);
+                showStatus('Erro ao adicionar o áudio: ' + error.message, true);
+                addButton.disabled = false;
+                addButton.textContent = 'Adicionar Áudio';
+            }
+        }
+
+        // Adicionar instruções iniciais na página
+        document.addEventListener('DOMContentLoaded', function() {
+            const instructions = document.createElement('div');
+            instructions.style.cssText = `
+                background-color: #fff3cd;
+                color: #856404;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                font-size: 14px;
+                line-height: 1.5;
+            `;
+            instructions.innerHTML = `
+                <strong>Instruções:</strong><br>
+                1. Antes de adicionar um novo áudio:<br>
+                <div style="margin-left: 20px; margin-top: 5px;">
+                    a) Coloque o arquivo de áudio na pasta "Audios/"<br>
+                    <span style="color: #666; font-size: 12px;">Formato suportado: .m4a (áudio gravado no iPhone)</span><br>
+                    <span style="color: #666; font-size: 12px;">📂 Localização: pasta "Audios" na raiz do app</span><br><br>
+                    b) Coloque a imagem na pasta "icons/"<br>
+                    <span style="color: #666; font-size: 12px;">Formatos suportados: .jpg ou .jpeg</span><br>
+                    <span style="color: #666; font-size: 12px;">📂 Localização: pasta "icons" na raiz do app</span>
+                </div>
+                2. Depois selecione os mesmos arquivos nos campos abaixo<br>
+                3. Clique em "Adicionar Áudio"<br><br>
+                <div style="background-color: #e9ecef; padding: 10px; border-radius: 5px; font-size: 12px;">
+                    💡 Dica: Ao clicar em "Localizar", navegue até a pasta do app e depois entre na pasta "Audios" ou "icons" para encontrar seus arquivos.
+                </div>
+            `;
+            document.querySelector('.add-form').insertBefore(instructions, document.querySelector('.file-input-container'));
+        });
+    </script>
+</body>
+</html> 

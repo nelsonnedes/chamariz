@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/app-icon.png">
+    <title>Editar/Remover Áudios - Chamariz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --danger-color: #dc3545;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--background-color);
+            padding: 20px;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--card-background);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-button {
+            font-size: 24px;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 10px;
+            transition: transform 0.2s;
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .audio-list {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .audio-card {
+            background: var(--card-background);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .audio-card:active {
+            transform: scale(0.98);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        }
+
+        .audio-card[data-type="default"] {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .audio-card[data-type="custom"] {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .audio-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .audio-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        .audio-title {
+            font-size: 18px;
+            color: #333;
+            flex: 1;
+        }
+
+        .audio-controls {
+            width: 100%;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .edit-form {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            display: none;
+        }
+
+        .file-input-container {
+            margin: 10px 0;
+        }
+
+        .file-input-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 5px;
+            font-size: 16px;
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: white;
+        }
+
+        .preview-container {
+            margin: 10px 0;
+        }
+
+        .preview-image {
+            max-width: 100px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .preview-audio {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .edit-button, .remove-button {
+            min-width: 44px;
+            min-height: 44px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .edit-button {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .edit-button:active {
+            transform: scale(0.95);
+        }
+
+        .remove-button {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .remove-button:active {
+            transform: scale(0.95);
+        }
+
+        .save-button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .save-button:active {
+            transform: scale(0.98);
+            background-color: #1976D2;
+        }
+
+        .save-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+            text-align: center;
+        }
+
+        .status-message.success {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .status-message.error {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .no-audios-message {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .loop-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .time-input, .pause-input {
+            flex: 1;
+            min-width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .pause-label {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+                padding-top: calc(15px + env(safe-area-inset-top));
+                padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            }
+
+            .audio-card {
+                padding: 15px;
+            }
+
+            .audio-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .edit-button, .remove-button {
+                min-width: 40px;
+                min-height: 40px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="back-button" onclick="window.location.href='index.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <div class="header">Editar/Remover Áudios</div>
+        <div style="width: 44px;"></div>
+    </div>
+
+    <div class="audio-list" id="audioList">
+        <!-- Os cards de áudio serão inseridos aqui via JavaScript -->
+    </div>
+
+    <div class="status-message" id="statusMessage"></div>
+
+    <script>
+        // Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado com sucesso:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Falha ao registrar o ServiceWorker:', error);
+                    });
+            });
+        }
+
+        // Gerenciamento de Estado
+        const state = {
+            audios: [],
+            isLoading: false,
+            error: null
+        };
+
+        // Função para salvar estado no localStorage
+        function saveState() {
+            try {
+                localStorage.setItem('audioCards', JSON.stringify(state.audios));
+            } catch (error) {
+                console.error('Erro ao salvar estado:', error);
+                showStatus('Erro ao salvar alterações. Por favor, tente novamente.', true);
+            }
+        }
+
+        // Função para carregar estado do localStorage
+        function loadState() {
+            try {
+                const savedAudios = localStorage.getItem('audioCards');
+                if (savedAudios) {
+                    state.audios = JSON.parse(savedAudios);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar estado:', error);
+                showStatus('Erro ao carregar áudios. Por favor, tente novamente.', true);
+            }
+        }
+
+        // Função para adicionar áudio
+        function addAudio(audioData) {
+            state.audios.push(audioData);
+            saveState();
+            renderAudioCard(audioData);
+        }
+
+        // Função para remover áudio
+        function removeAudio(audioName) {
+            if (confirm(`Tem certeza que deseja excluir o áudio "${audioName}"?`)) {
+                try {
+                    state.audios = state.audios.filter(audio => audio.name !== audioName);
+                    saveState();
+                    
+                    const card = document.querySelector(`.audio-card[data-name="${audioName}"]`);
+                    if (card) {
+                        card.remove();
+                    }
+                    
+                    showStatus('Áudio removido com sucesso!');
+                    
+                } catch (error) {
+                    console.error('Erro ao remover áudio:', error);
+                    showStatus('Erro ao remover o áudio. Por favor, tente novamente.', true);
+                }
+            }
+        }
+
+        // Função para atualizar áudio
+        function updateAudio(audioName, updates) {
+            try {
+                const index = state.audios.findIndex(audio => audio.name === audioName);
+                if (index !== -1) {
+                    state.audios[index] = { ...state.audios[index], ...updates };
+                    saveState();
+                    showStatus('Alterações salvas com sucesso!');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar áudio:', error);
+                showStatus('Erro ao salvar alterações. Por favor, tente novamente.', true);
+            }
+        }
+
+        // Função para renderizar card de áudio
+        function renderAudioCard(card) {
+            const audioList = document.getElementById('audioList');
+            const audioCard = document.createElement('div');
+            audioCard.className = 'audio-card';
+            audioCard.dataset.name = card.name;
+            
+            audioCard.innerHTML = `
+                <div class="audio-header">
+                    <img src="${card.image}" alt="${card.name}" class="audio-icon" loading="lazy">
+                    <div class="audio-title">${card.name}</div>
+                    <button class="edit-button" onclick="editAudio('${card.name}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="remove-button" onclick="removeAudio('${card.name}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <audio class="audio-controls" controls preload="metadata" src="${card.audio}"></audio>
+                <div class="edit-form" id="editForm_${card.name}">
+                    <div class="file-input-container">
+                        <label class="file-input-label">Novo Arquivo de Áudio (M4A)</label>
+                        <input type="file" class="file-input" accept=".m4a" 
+                            onchange="handleAudioFileChange(this, '${card.name}')">
+                        <div class="preview-container">
+                            <audio class="preview-audio" controls></audio>
+                        </div>
+                    </div>
+                    <div class="file-input-container">
+                        <label class="file-input-label">Nova Imagem (JPEG/JPG)</label>
+                        <input type="file" class="file-input" accept=".jpg,.jpeg" 
+                            onchange="handleImageFileChange(this, '${card.name}')">
+                        <div class="preview-container">
+                            <img class="preview-image" alt="Preview" loading="lazy">
+                        </div>
+                    </div>
+                    <div class="button-container">
+                        <button class="save-button" onclick="saveChanges('${card.name}')">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            audioList.appendChild(audioCard);
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            loadAudios();
+        });
+
+        function loadAudios() {
+            const audioList = document.getElementById('audioList');
+            
+            // Carregar áudios padrão
+            const defaultAudios = [
+                { name: 'Jacu', audio: 'Audios/Jacu.m4a', image: 'icons/Jacu.jpeg' },
+                { name: 'Arancuan', audio: 'Audios/Arancuan.m4a', image: 'icons/Arancuan.jpeg' },
+                { name: 'Lambu Sururina', audio: 'Audios/Lambu Sururina.m4a', image: 'icons/Lambu Sururina.jpg' },
+                { name: 'Lambu Preta', audio: 'Audios/Lambu Preta.m4a', image: 'icons/Lambu Preta.jpeg' },
+                { name: 'Galega', audio: 'Audios/Galega.m4a', image: 'icons/Galega.jpg' },
+                { name: 'Juriti', audio: 'Audios/Juriti.m4a', image: 'icons/Juriti.jpg' }
+            ];
+
+            // Carregar áudios personalizados
+            const customCards = JSON.parse(localStorage.getItem('audioCards') || '[]');
+            
+            // Combinar todos os áudios
+            const allAudios = [...defaultAudios, ...customCards];
+
+            if (allAudios.length === 0) {
+                audioList.innerHTML = '<div class="no-audios-message">Nenhum áudio encontrado.</div>';
+                return;
+            }
+
+            allAudios.forEach(card => {
+                const audioCard = document.createElement('div');
+                audioCard.className = 'audio-card';
+                audioCard.dataset.name = card.name;
+                audioCard.dataset.type = defaultAudios.some(a => a.name === card.name) ? 'default' : 'custom';
+                
+                audioCard.innerHTML = `
+                    <div class="audio-header">
+                        <img src="${card.image}" alt="${card.name}" class="audio-icon">
+                        <div class="audio-title">${card.name}</div>
+                        <button class="edit-button" onclick="editAudio('${card.name}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="remove-button" onclick="removeAudio('${card.name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <audio class="audio-controls" controls src="${card.audio}"></audio>
+                    <div class="edit-form" id="editForm_${card.name}">
+                        <div class="file-input-container">
+                            <label class="file-input-label">Novo Arquivo de Áudio (M4A)</label>
+                            <input type="file" class="file-input" accept=".m4a" 
+                                onchange="handleAudioFileChange(this, '${card.name}')">
+                            <div class="preview-container">
+                                <audio class="preview-audio" controls></audio>
+                            </div>
+                        </div>
+                        <div class="file-input-container">
+                            <label class="file-input-label">Nova Imagem (JPEG/JPG)</label>
+                            <input type="file" class="file-input" accept=".jpg,.jpeg" 
+                                onchange="handleImageFileChange(this, '${card.name}')">
+                            <div class="preview-container">
+                                <img class="preview-image" alt="Preview">
+                            </div>
+                        </div>
+                        <div class="button-container">
+                            <button class="save-button" onclick="saveChanges('${card.name}')">
+                                <i class="fas fa-save"></i> Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                audioList.appendChild(audioCard);
+            });
+        }
+
+        function editAudio(audioName) {
+            const editForm = document.getElementById(`editForm_${audioName}`);
+            const editButton = editForm.previousElementSibling.querySelector('.edit-button');
+            const saveButton = editForm.querySelector('.save-button');
+            
+            // Esconder todos os outros formulários de edição
+            document.querySelectorAll('.edit-form').forEach(form => {
+                if (form.id !== `editForm_${audioName}`) {
+                    form.style.display = 'none';
+                    const otherEditButton = form.previousElementSibling.querySelector('.edit-button');
+                    const otherSaveButton = form.querySelector('.save-button');
+                    if (otherEditButton) otherEditButton.style.display = 'block';
+                    if (otherSaveButton) otherSaveButton.style.display = 'none';
+                }
+            });
+
+            // Mostrar/esconder o formulário atual
+            if (editForm.style.display === 'none' || !editForm.style.display) {
+                editForm.style.display = 'block';
+                editButton.style.display = 'none';
+                saveButton.style.display = 'block';
+            } else {
+                editForm.style.display = 'none';
+                editButton.style.display = 'block';
+                saveButton.style.display = 'none';
+            }
+        }
+
+        function handleAudioFileChange(input, audioName) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const preview = input.parentElement.querySelector('.preview-audio');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateSaveButton(audioName);
+        }
+
+        function handleImageFileChange(input, audioName) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const preview = input.parentElement.querySelector('.preview-image');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateSaveButton(audioName);
+        }
+
+        function updateSaveButton(audioName) {
+            const editForm = document.getElementById(`editForm_${audioName}`);
+            const saveButton = editForm.querySelector('.save-button');
+            const audioInput = editForm.querySelector('input[type="file"][accept=".m4a"]');
+            const imageInput = editForm.querySelector('input[type="file"][accept=".jpg,.jpeg"]');
+            
+            saveButton.disabled = !(audioInput.files[0] || imageInput.files[0]);
+        }
+
+        function saveChanges(audioName) {
+            const editForm = document.getElementById(`editForm_${audioName}`);
+            const audioInput = editForm.querySelector('input[type="file"][accept=".m4a"]');
+            const imageInput = editForm.querySelector('input[type="file"][accept=".jpg,.jpeg"]');
+            
+            try {
+                let cards = JSON.parse(localStorage.getItem('audioCards') || '[]');
+                const cardIndex = cards.findIndex(card => card.name === audioName);
+                
+                if (cardIndex === -1) {
+                    throw new Error('Áudio não encontrado');
+                }
+
+                if (audioInput.files[0]) {
+                    cards[cardIndex].audio = `Audios/${audioInput.files[0].name}`;
+                }
+                
+                if (imageInput.files[0]) {
+                    cards[cardIndex].image = `icons/${imageInput.files[0].name}`;
+                }
+
+                localStorage.setItem('audioCards', JSON.stringify(cards));
+                
+                showStatus('Alterações salvas com sucesso!');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Erro ao salvar alterações:', error);
+                showStatus('Erro ao salvar alterações. Por favor, tente novamente.', true);
+            }
+        }
+
+        function showStatus(message, isError = false) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = 'status-message ' + (isError ? 'error' : 'success');
+            statusElement.style.display = 'block';
+            
+            if (!isError) {
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function setupAudioCard(card) {
+            const audio = card.querySelector('audio');
+            const startInput = card.querySelector('.time-input:first-of-type');
+            const endInput = card.querySelector('.time-input:nth-of-type(2)');
+            const pauseInput = card.querySelector('.time-input:nth-of-type(3)');
+            const loopButton = card.querySelector('.loop-button');
+            let isLooping = false;
+            let pauseTimeout;
+            let isWaitingForPause = false;
+
+            audio.addEventListener('timeupdate', () => {
+                if (isLooping && !isWaitingForPause) {
+                    const start = parseFloat(startInput.value) || 0;
+                    const end = parseFloat(endInput.value) || audio.duration;
+                    
+                    if (audio.currentTime >= end) {
+                        audio.pause();
+                        isWaitingForPause = true;
+                        const pauseDuration = (parseFloat(pauseInput.value) || 0) * 1000;
+                        
+                        clearTimeout(pauseTimeout);
+                        pauseTimeout = setTimeout(() => {
+                            if (isLooping) {
+                                isWaitingForPause = false;
+                                audio.currentTime = start;
+                                const playPromise = audio.play();
+                                if (playPromise !== undefined) {
+                                    playPromise.catch(error => {
+                                        console.log("Erro ao reproduzir áudio:", error);
+                                    });
+                                }
+                            }
+                        }, pauseDuration);
+                    }
+                }
+            });
+
+            loopButton.addEventListener('click', () => {
+                isLooping = !isLooping;
+                isWaitingForPause = false;
+                loopButton.classList.toggle('active');
+                
+                if (isLooping) {
+                    const start = parseFloat(startInput.value) || 0;
+                    audio.currentTime = start;
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log("Erro ao reproduzir áudio:", error);
+                        });
+                    }
+                    loopButton.textContent = 'Parar Loop';
+                } else {
+                    audio.pause();
+                    clearTimeout(pauseTimeout);
+                    loopButton.textContent = 'Loop';
+                }
+            });
+
+            audio.addEventListener('loadedmetadata', () => {
+                endInput.max = audio.duration;
+                startInput.max = audio.duration;
+            });
+
+            audio.addEventListener('pause', () => {
+                if (!isLooping) {
+                    clearTimeout(pauseTimeout);
+                    isWaitingForPause = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html> 
