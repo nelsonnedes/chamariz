@@ -1,20 +1,27 @@
 {
-  "name": "Chamariz",
+  "name": "Chamariz - Player de Áudio",
   "short_name": "Chamariz",
+  "description": "Aplicativo para reprodução de cantos de pássaros e animais",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#2196F3",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "icons/app-icon.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     },
     {
-      "src": "icons/app-icon-large.png",
+      "src": "icons/Arancuan.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "icons/Arancuan.jpeg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/jpeg"
     }
   ]
 } 
