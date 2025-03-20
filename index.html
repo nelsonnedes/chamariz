@@ -307,6 +307,42 @@
             width: 24px;
             text-align: center;
         }
+
+        .status-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .status-message.success {
+            background-color: #4CAF50;
+        }
+
+        .status-message.warning {
+            background-color: #ff9800;
+        }
+
+        .status-message.error {
+            background-color: #f44336;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -447,14 +483,41 @@
         // Registrar Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register('sw.js')
                     .then(registration => {
                         console.log('ServiceWorker registrado com sucesso:', registration.scope);
+                        checkConnectivity();
                     })
                     .catch(error => {
                         console.log('Falha ao registrar o ServiceWorker:', error);
                     });
             });
+
+            // Verificar conectividade
+            function checkConnectivity() {
+                if (!navigator.onLine) {
+                    showStatus('Você está offline. Os áudios salvos ainda funcionarão.', 'warning');
+                }
+            }
+
+            window.addEventListener('online', () => {
+                showStatus('Você está online novamente!', 'success');
+            });
+
+            window.addEventListener('offline', () => {
+                showStatus('Você está offline. Os áudios salvos ainda funcionarão.', 'warning');
+            });
+        }
+
+        function showStatus(message, type = 'success') {
+            const statusElement = document.createElement('div');
+            statusElement.className = `status-message ${type}`;
+            statusElement.textContent = message;
+            document.body.appendChild(statusElement);
+
+            setTimeout(() => {
+                statusElement.remove();
+            }, 3000);
         }
 
         // Estrutura de dados para armazenar informações dos áudios
