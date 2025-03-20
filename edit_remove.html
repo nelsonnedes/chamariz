@@ -376,8 +376,14 @@
         function removeAudio(audioName) {
             if (confirm(`Tem certeza que deseja excluir o áudio "${audioName}"?`)) {
                 try {
-                    state.audios = state.audios.filter(audio => audio.name !== audioName);
-                    saveState();
+                    // Carregar dados do localStorage
+                    let audioData = JSON.parse(localStorage.getItem('audioData') || '{"defaultAudios":[],"customAudios":[]}');
+                    
+                    // Remover o áudio do array apropriado
+                    audioData.customAudios = audioData.customAudios.filter(audio => audio.name !== audioName);
+                    
+                    // Salvar as alterações
+                    localStorage.setItem('audioData', JSON.stringify(audioData));
                     
                     const card = document.querySelector(`.audio-card[data-name="${audioName}"]`);
                     if (card) {
@@ -385,6 +391,9 @@
                     }
                     
                     showStatus('Áudio removido com sucesso!');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
                     
                 } catch (error) {
                     console.error('Erro ao remover áudio:', error);
@@ -394,17 +403,59 @@
         }
 
         // Função para atualizar áudio
-        function updateAudio(audioName, updates) {
+        async function updateAudio(audioName, audioFile, imageFile) {
             try {
-                const index = state.audios.findIndex(audio => audio.name === audioName);
-                if (index !== -1) {
-                    state.audios[index] = { ...state.audios[index], ...updates };
-                    saveState();
-                    showStatus('Alterações salvas com sucesso!');
+                // Carregar dados do localStorage
+                let audioData = JSON.parse(localStorage.getItem('audioData') || '{"defaultAudios":[],"customAudios":[]}');
+                
+                // Encontrar o áudio nos arrays
+                let audioArray = audioData.defaultAudios;
+                let audioIndex = audioArray.findIndex(audio => audio.name === audioName);
+                let isCustom = false;
+                
+                if (audioIndex === -1) {
+                    audioArray = audioData.customAudios;
+                    audioIndex = audioArray.findIndex(audio => audio.name === audioName);
+                    isCustom = true;
                 }
+                
+                if (audioIndex === -1) {
+                    throw new Error('Áudio não encontrado');
+                }
+
+                // Atualizar os arquivos que foram alterados
+                const updates = {};
+                
+                if (audioFile) {
+                    const audioBase64 = await fileToBase64(audioFile);
+                    updates.audioPath = audioBase64;
+                }
+                
+                if (imageFile) {
+                    const imageBase64 = await fileToBase64(imageFile);
+                    updates.imagePath = imageBase64;
+                }
+
+                // Aplicar as atualizações
+                if (isCustom) {
+                    audioData.customAudios[audioIndex] = {
+                        ...audioData.customAudios[audioIndex],
+                        ...updates
+                    };
+                } else {
+                    audioData.defaultAudios[audioIndex] = {
+                        ...audioData.defaultAudios[audioIndex],
+                        ...updates
+                    };
+                }
+
+                // Salvar as alterações
+                localStorage.setItem('audioData', JSON.stringify(audioData));
+                return true;
+                
             } catch (error) {
                 console.error('Erro ao atualizar áudio:', error);
-                showStatus('Erro ao salvar alterações. Por favor, tente novamente.', true);
+                throw error;
             }
         }
 
@@ -464,50 +515,40 @@
         function loadAudios() {
             const audioList = document.getElementById('audioList');
             
-            // Carregar áudios padrão
-            const defaultAudios = [
-                { name: 'Jacu', audio: 'Audios/Jacu.m4a', image: 'icons/Jacu.jpeg' },
-                { name: 'Arancuan', audio: 'Audios/Arancuan.m4a', image: 'icons/Arancuan.jpeg' },
-                { name: 'Lambu Sururina', audio: 'Audios/Lambu Sururina.m4a', image: 'icons/Lambu Sururina.jpg' },
-                { name: 'Lambu Preta', audio: 'Audios/Lambu Preta.m4a', image: 'icons/Lambu Preta.jpeg' },
-                { name: 'Galega', audio: 'Audios/Galega.m4a', image: 'icons/Galega.jpg' },
-                { name: 'Juriti', audio: 'Audios/Juriti.m4a', image: 'icons/Juriti.jpg' }
-            ];
-
-            // Carregar áudios personalizados
-            const customCards = JSON.parse(localStorage.getItem('audioCards') || '[]');
+            // Carregar dados do localStorage
+            const audioData = JSON.parse(localStorage.getItem('audioData') || '{"defaultAudios":[],"customAudios":[]}');
             
-            // Combinar todos os áudios
-            const allAudios = [...defaultAudios, ...customCards];
+            // Combinar áudios padrão e personalizados
+            const allAudios = [...audioData.defaultAudios, ...audioData.customAudios];
 
             if (allAudios.length === 0) {
                 audioList.innerHTML = '<div class="no-audios-message">Nenhum áudio encontrado.</div>';
                 return;
             }
 
-            allAudios.forEach(card => {
+            allAudios.forEach(audio => {
                 const audioCard = document.createElement('div');
                 audioCard.className = 'audio-card';
-                audioCard.dataset.name = card.name;
-                audioCard.dataset.type = defaultAudios.some(a => a.name === card.name) ? 'default' : 'custom';
+                audioCard.dataset.name = audio.name;
+                audioCard.dataset.type = audioData.defaultAudios.some(a => a.name === audio.name) ? 'default' : 'custom';
                 
                 audioCard.innerHTML = `
                     <div class="audio-header">
-                        <img src="${card.image}" alt="${card.name}" class="audio-icon">
-                        <div class="audio-title">${card.name}</div>
-                        <button class="edit-button" onclick="editAudio('${card.name}')">
+                        <img src="${audio.imagePath}" alt="${audio.name}" class="audio-icon">
+                        <div class="audio-title">${audio.name}</div>
+                        <button class="edit-button" onclick="editAudio('${audio.name}')">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="remove-button" onclick="removeAudio('${card.name}')">
+                        <button class="remove-button" onclick="removeAudio('${audio.name}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
-                    <audio class="audio-controls" controls src="${card.audio}"></audio>
-                    <div class="edit-form" id="editForm_${card.name}">
+                    <audio class="audio-controls" controls src="${audio.audioPath}"></audio>
+                    <div class="edit-form" id="editForm_${audio.name}">
                         <div class="file-input-container">
                             <label class="file-input-label">Novo Arquivo de Áudio (M4A)</label>
                             <input type="file" class="file-input" accept=".m4a" 
-                                onchange="handleAudioFileChange(this, '${card.name}')">
+                                onchange="handleAudioFileChange(this, '${audio.name}')">
                             <div class="preview-container">
                                 <audio class="preview-audio" controls></audio>
                             </div>
@@ -515,13 +556,13 @@
                         <div class="file-input-container">
                             <label class="file-input-label">Nova Imagem (JPEG/JPG)</label>
                             <input type="file" class="file-input" accept=".jpg,.jpeg" 
-                                onchange="handleImageFileChange(this, '${card.name}')">
+                                onchange="handleImageFileChange(this, '${audio.name}')">
                             <div class="preview-container">
                                 <img class="preview-image" alt="Preview">
                             </div>
                         </div>
                         <div class="button-container">
-                            <button class="save-button" onclick="saveChanges('${card.name}')">
+                            <button class="save-button" onclick="saveChanges('${audio.name}')">
                                 <i class="fas fa-save"></i> Salvar Alterações
                             </button>
                         </div>
@@ -589,28 +630,17 @@
             saveButton.disabled = !(audioInput.files[0] || imageInput.files[0]);
         }
 
-        function saveChanges(audioName) {
+        async function saveChanges(audioName) {
             const editForm = document.getElementById(`editForm_${audioName}`);
             const audioInput = editForm.querySelector('input[type="file"][accept=".m4a"]');
             const imageInput = editForm.querySelector('input[type="file"][accept=".jpg,.jpeg"]');
             
             try {
-                let cards = JSON.parse(localStorage.getItem('audioCards') || '[]');
-                const cardIndex = cards.findIndex(card => card.name === audioName);
-                
-                if (cardIndex === -1) {
-                    throw new Error('Áudio não encontrado');
-                }
-
-                if (audioInput.files[0]) {
-                    cards[cardIndex].audio = `Audios/${audioInput.files[0].name}`;
-                }
-                
-                if (imageInput.files[0]) {
-                    cards[cardIndex].image = `icons/${imageInput.files[0].name}`;
-                }
-
-                localStorage.setItem('audioCards', JSON.stringify(cards));
+                await updateAudio(
+                    audioName,
+                    audioInput.files[0],
+                    imageInput.files[0]
+                );
                 
                 showStatus('Alterações salvas com sucesso!');
                 setTimeout(() => {
@@ -621,6 +651,15 @@
                 console.error('Erro ao salvar alterações:', error);
                 showStatus('Erro ao salvar alterações. Por favor, tente novamente.', true);
             }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
         function showStatus(message, isError = false) {
