@@ -365,7 +365,7 @@
                 const audioName = newAudioFile.name.replace(/\.[^/.]+$/, "");
 
                 // Carregar dados atuais do syncManager
-                const audioData = await syncManager.getAllAudios();
+                const audioData = await window.syncManager.getAllAudios();
 
                 // Verificar duplicatas
                 const allAudios = [...(audioData.defaultAudios || []), ...(audioData.customAudios || [])];
@@ -384,8 +384,8 @@
                 });
 
                 // Salvar via syncManager
-                await syncManager.saveAudios(audioData);
-                syncManager.broadcastChange(audioData);
+                await window.syncManager.saveAudios(audioData);
+                window.syncManager.broadcastChange(audioData);
 
                 showStatus('✓ Áudio adicionado! Sincronizando...', 'success');
                 setTimeout(() => window.location.href = 'index.html', 1500);
