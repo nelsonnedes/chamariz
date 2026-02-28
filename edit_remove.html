@@ -14,7 +14,16 @@
         .back-button { font-size:24px; color:#2196F3; background:none; border:none; cursor:pointer; padding:10px; }
         .container { max-width:600px; margin:20px auto; background:#fff; border-radius:15px; box-shadow:0 2px 10px rgba(0,0,0,0.1); padding:20px; text-align:center; }
         .hint { color:#666; font-size:14px; margin-top:10px; }
-        .btn { margin-top:20px; background:#2196F3; color:#fff; border:none; padding:12px 20px; border-radius:10px; cursor:pointer; }
+        .btn { margin-top:20px; background:#2196F3; color:#fff; border:none; padding:12px 20px; border-radius:10px; cursor:pointer; font-size:16px; }
+        
+        /* Lista de áudios */
+        #audioList { text-align: left; margin-top: 20px; }
+        .audio-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; }
+        .audio-item:last-child { border-bottom: none; }
+        .audio-item img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #ddd; }
+        .audio-info { flex: 1; }
+        .audio-name { font-weight: bold; font-size: 16px; }
+        .delete-btn { background: none; border: none; color: #f44336; cursor: pointer; font-size: 18px; padding: 5px; }
     </style>
     <script src="./sync-manager.js"></script>
 </head>
@@ -25,9 +34,84 @@
         <div style="width:44px;"></div>
     </div>
     <div class="container">
-        <p>Funcionalidade em desenvolvimento.</p>
-        <p class="hint">Use a tela “Adicionar Novo Áudio” para incluir conteúdos. Remoção de itens personalizados pode ser feita pela lista na tela principal.</p>
-        <button class="btn" onclick="window.location.href='add.html'">Adicionar Novo Áudio</button>
+        <h2>Meus Áudios</h2>
+        <div id="audioList">
+            <p class="hint">Carregando...</p>
+        </div>
+        <p class="hint" id="emptyHint" style="display:none">Nenhum áudio personalizado encontrado.</p>
+        <button class="btn" onclick="window.location.href='add.html'">
+            <i class="fas fa-plus"></i> Adicionar Novo Áudio
+        </button>
     </div>
+
+    <script>
+        // Inicializar SyncManager se necessário
+        if (typeof window.syncManager === 'undefined') {
+            try {
+                window.syncManager = new SyncManager();
+            } catch (e) {
+                console.error('Erro ao inicializar syncManager:', e);
+            }
+        }
+
+        async function loadAudios() {
+            const list = document.getElementById('audioList');
+            const emptyHint = document.getElementById('emptyHint');
+            
+            try {
+                const data = await window.syncManager.getAllAudios();
+                const customAudios = data.customAudios || [];
+
+                if (customAudios.length === 0) {
+                    list.style.display = 'none';
+                    emptyHint.style.display = 'block';
+                    return;
+                }
+
+                list.innerHTML = '';
+                list.style.display = 'block';
+                emptyHint.style.display = 'none';
+
+                customAudios.forEach(audio => {
+                    const item = document.createElement('div');
+                    item.className = 'audio-item';
+                    item.innerHTML = `
+                        <img src="${audio.imagePath}" alt="${audio.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23ddd%22/><text x=%2250%22 y=%2250%22 dy=%22.35em%22 text-anchor=%22middle%22 font-size=%2240%22>🎵</text></svg>'">
+                        <div class="audio-info">
+                            <div class="audio-name">${audio.name}</div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteAudio('${audio.name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    `;
+                    list.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error('Erro ao carregar áudios:', error);
+                list.innerHTML = '<p class="hint">Erro ao carregar lista.</p>';
+            }
+        }
+
+        async function deleteAudio(name) {
+            if (!confirm(`Tem certeza que deseja remover "${name}"?`)) return;
+
+            try {
+                const data = await window.syncManager.getAllAudios();
+                if (data.customAudios) {
+                    data.customAudios = data.customAudios.filter(a => a.name !== name);
+                    await window.syncManager.saveAudios(data);
+                    window.syncManager.broadcastChange(data);
+                    loadAudios(); // Recarregar lista
+                }
+            } catch (error) {
+                console.error('Erro ao remover:', error);
+                alert('Erro ao remover áudio.');
+            }
+        }
+
+        // Carregar ao iniciar
+        document.addEventListener('DOMContentLoaded', loadAudios);
+    </script>
 </body>
 </html>
