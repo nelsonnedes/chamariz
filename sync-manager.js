@@ -428,7 +428,7 @@ class SyncManager {
 
 // Criar instância global com tratamento de erro
 try {
-    const syncManager = new SyncManager();
+    window.syncManager = new SyncManager();
 } catch (error) {
     console.error('Erro ao criar SyncManager:', error);
 }
