@@ -199,9 +199,20 @@ class SyncManager {
                 }
             }
 
-            // Salvar também no localStorage
-            localStorage.setItem('audioData', JSON.stringify(audioData));
-            localStorage.setItem('audioData_timestamp', timestamp.toString());
+            // Salvar também no localStorage (apenas se for pequeno, para evitar QuotaExceededError)
+            try {
+                const json = JSON.stringify(audioData);
+                if (json.length < 4000000) { // Limite seguro ~4MB
+                    localStorage.setItem('audioData', json);
+                } else {
+                    console.warn('⚠ Dados muito grandes para localStorage, salvando apenas no IndexedDB.');
+                    // Salvar um placeholder ou versão leve se possível, ou apenas remover o antigo para evitar inconsistência
+                    localStorage.removeItem('audioData'); 
+                }
+                localStorage.setItem('audioData_timestamp', timestamp.toString());
+            } catch (e) {
+                console.warn('⚠ Erro ao salvar no localStorage (QuotaExceeded?):', e);
+            }
 
             this.notifyListeners({
                 type: 'save',
@@ -236,7 +247,17 @@ class SyncManager {
             
             if (dbData && dbData.hash !== currentHash) {
                 if (dbData.timestamp > (localData.timestamp || 0)) {
-                    localStorage.setItem('audioData', JSON.stringify(dbData.data));
+            // Tentar salvar no localStorage se possível
+            try {
+                const json = JSON.stringify(dbData.data);
+                if (json.length < 4000000) {
+                    localStorage.setItem('audioData', json);
+                } else {
+                    localStorage.removeItem('audioData');
+                }
+            } catch (e) {
+                console.warn('Sync: Erro ao salvar localStorage', e);
+            }
                     
                     this.notifyListeners({
                         type: 'sync',
