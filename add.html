@@ -293,6 +293,13 @@
 
     <script src="./sync-manager.js"></script>
     <script>
+        if (typeof window.syncManager === 'undefined') {
+            try {
+                window.syncManager = new SyncManager();
+            } catch (e) {
+                console.error('Erro ao inicializar syncManager:', e);
+            }
+        }
         let newAudioFile = null;
         let newImageFile = null;
 
