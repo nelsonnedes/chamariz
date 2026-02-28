@@ -11,9 +11,10 @@ const RUNTIME_CACHE = 'chamariz-runtime-v1';
 const PRECACHE_URLS = [
     './index.html',
     './add.html',
+    './edit_remove.html',
     './manifest.json',
     './sync-manager.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
+    './css/all.min.css'
 ];
 
 // ===== INSTALL EVENT =====
