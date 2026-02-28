@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2196F3">
+    <title>Adicionar Áudio - Chamariz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background-color);
+            padding: 20px;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--card-background);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-button {
+            font-size: 24px;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 10px;
+            transition: transform 0.2s;
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+        }
+
+        .header {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .add-form {
+            background: var(--card-background);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 600px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-input-container {
+            margin: 15px 0;
+        }
+
+        .file-input-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            background: var(--background-color);
+            transition: all 0.3s;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .file-input:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(33, 150, 243, 0.05);
+        }
+
+        .supported-formats {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .preview-container {
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .preview-audio {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .preview-image {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 10px;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .add-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .add-button:hover {
+            background-color: #1976D2;
+        }
+
+        .add-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+            font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .status-message.active {
+            display: block;
+        }
+
+        .status-message.success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .status-message.error {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .status-message.info {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-10px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .add-form {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="back-button" onclick="window.location.href='index.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <div class="header">➕ Adicionar Novo Áudio</div>
+        <div style="width: 44px;"></div>
+    </div>
+
+    <div class="add-form">
+        <div class="section">
+            <div class="section-title">
+                <i class="fas fa-music"></i> Arquivo de Áudio
+            </div>
+            <div class="file-input-container">
+                <label class="file-input-label">Selecione um Áudio</label>
+                <input type="file" class="file-input" id="audioFile" accept="audio/*" onchange="handleAudioFile(this)">
+                <div class="supported-formats">
+                    📁 Formatos: MP3, WAV, OGG, M4A, FLAC, AAC<br>
+                    ✓ Sincroniza automaticamente entre dispositivos
+                </div>
+                <div class="preview-container">
+                    <audio class="preview-audio" id="audioPreview" controls></audio>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">
+                <i class="fas fa-image"></i> Imagem do Áudio
+            </div>
+            <div class="file-input-container">
+                <label class="file-input-label">Selecione uma Imagem</label>
+                <input type="file" class="file-input" id="imageFile" accept="image/*" onchange="handleImageFile(this)">
+                <div class="supported-formats">
+                    📁 Formatos: JPEG, PNG, WebP<br>
+                    ✓ Sincroniza automaticamente entre dispositivos
+                </div>
+                <div class="preview-container">
+                    <img class="preview-image" id="imagePreview" alt="Preview">
+                </div>
+            </div>
+        </div>
+
+        <div class="status-message" id="statusMessage"></div>
+        <button class="add-button" onclick="addNewAudio()" id="addButton" disabled>
+            <i class="fas fa-plus"></i> Adicionar Áudio
+        </button>
+    </div>
+
+    <script src="./sync-manager.js"></script>
+    <script>
+        let newAudioFile = null;
+        let newImageFile = null;
+
+        function handleAudioFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            newAudioFile = file;
+            const preview = document.getElementById('audioPreview');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateAddButton();
+            showStatus(`✓ Áudio: ${file.name}`, 'success');
+        }
+
+        function handleImageFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            newImageFile = file;
+            const preview = document.getElementById('imagePreview');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            updateAddButton();
+            showStatus(`✓ Imagem: ${file.name}`, 'success');
+        }
+
+        function updateAddButton() {
+            document.getElementById('addButton').disabled = !(newAudioFile && newImageFile);
+        }
+
+        function showStatus(message, type = 'success') {
+            const elem = document.getElementById('statusMessage');
+            elem.textContent = message;
+            elem.className = `status-message active ${type}`;
+            setTimeout(() => elem.classList.remove('active'), 4000);
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function addNewAudio() {
+            if (!newAudioFile || !newImageFile) {
+                showStatus('Selecione áudio e imagem', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('addButton');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loading-spinner"></div> Processando...';
+
+            try {
+                showStatus('Convertendo para Base64...', 'info');
+
+                const audioBase64 = await fileToBase64(newAudioFile);
+                const imageBase64 = await fileToBase64(newImageFile);
+                const audioName = newAudioFile.name.replace(/\.[^/.]+$/, "");
+
+                // Carregar dados atuais do syncManager
+                const audioData = await syncManager.getAllAudios();
+
+                // Verificar duplicatas
+                const allAudios = [...(audioData.defaultAudios || []), ...(audioData.customAudios || [])];
+                if (allAudios.some(a => a.name === audioName)) {
+                    showStatus('✗ Áudio com esse nome já existe!', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-plus"></i> Adicionar Áudio';
+                    return;
+                }
+
+                audioData.customAudios = audioData.customAudios || [];
+                audioData.customAudios.push({
+                    name: audioName,
+                    audioPath: audioBase64,
+                    imagePath: imageBase64
+                });
+
+                // Salvar via syncManager
+                await syncManager.saveAudios(audioData);
+                syncManager.broadcastChange(audioData);
+
+                showStatus('✓ Áudio adicionado! Sincronizando...', 'success');
+                setTimeout(() => window.location.href = 'index.html', 1500);
+
+            } catch (error) {
+                console.error('Erro:', error);
+                showStatus(`✗ Erro: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-plus"></i> Adicionar Áudio';
+            }
+        }
+    </script>
+</body>
+</html>

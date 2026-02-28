@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Chamariz">
+    <meta name="theme-color" content="#2196F3">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75'>🎵</text></svg>">
+    <link rel="manifest" href="manifest.json">
+    
+    <title>Chamariz - Player de Áudio</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--background-color);
+            padding: 20px;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--card-background);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .sync-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        .sync-badge.syncing {
+            animation: spin 1s linear infinite;
+            background-color: var(--primary-color);
+        }
+
+        .sync-badge.offline {
+            background-color: var(--warning-color);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .home-button, .settings-button, .sync-button {
+            font-size: 24px;
+            color: var(--primary-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 10px;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .home-button:active, .settings-button:active, .sync-button:active {
+            transform: scale(0.95);
+        }
+
+        .search-container {
+            display: flex;
+            margin: 20px 0;
+            position: sticky;
+            top: 80px;
+            z-index: 99;
+            background: var(--background-color);
+            padding: 10px 0;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .player-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .audio-card {
+            background: var(--card-background);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .audio-card:active {
+            transform: scale(0.99);
+        }
+
+        .audio-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .audio-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            background-color: #ddd;
+        }
+
+        .audio-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .audio-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .audio-source {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .remove-button {
+            color: var(--danger-color);
+            background: none;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.2s;
+            display: none;
+            flex-shrink: 0;
+        }
+
+        .remove-button:hover {
+            color: #c82333;
+        }
+
+        .audio-card[data-custom="true"] .remove-button {
+            display: block;
+        }
+
+        .audio-controls {
+            width: 100%;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .loop-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .time-input {
+            flex: 1;
+            min-width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .loop-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .loop-button:hover {
+            background-color: #1976D2;
+        }
+
+        .loop-button.active {
+            background-color: var(--success-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: var(--card-background);
+            margin: 15% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 15px;
+            animation: slideIn 0.3s;
+        }
+
+        .close-modal {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .close-modal:hover {
+            color: #333;
+        }
+
+        .settings-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .settings-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background-color: var(--background-color);
+            border-radius: 10px;
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .settings-link:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .settings-link i {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .status-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            animation: slideUp 0.3s ease-out;
+            max-width: 90%;
+        }
+
+        .status-message.success {
+            background-color: var(--success-color);
+        }
+
+        .status-message.warning {
+            background-color: var(--warning-color);
+        }
+
+        .status-message.error {
+            background-color: var(--danger-color);
+        }
+
+        .status-message.info {
+            background-color: var(--primary-color);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background-color: rgba(33, 150, 243, 0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: var(--primary-color);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+
+            .audio-card {
+                padding: 15px;
+            }
+
+            .modal-content {
+                margin: 10% auto;
+                width: 95%;
+            }
+
+            .time-input {
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="home-button" onclick="window.location.href='index.html'" title="Início">
+            <i class="fas fa-home"></i>
+        </button>
+        <button class="sync-button" onclick="manualSync()" title="Sincronizar">
+            <i class="fas fa-sync"></i>
+            <div class="sync-badge" id="syncBadge"></div>
+        </button>
+        <button class="settings-button" onclick="openSettings()" title="Configurações">
+            <i class="fas fa-cog"></i>
+        </button>
+    </div>
+
+    <div class="header">🎵 Player de Áudio</div>
+    
+    <div class="search-container">
+        <input type="text" class="search-input" placeholder="Localizar áudio..." oninput="filterAudios(this.value)">
+        <button onclick="location.reload()" style="background: none; border: none; cursor: pointer; color: var(--primary-color); font-size: 20px;" title="Atualizar">
+            <i class="fas fa-redo"></i>
+        </button>
+    </div>
+
+    <div id="refreshIndicator" class="refresh-indicator" style="display: none;">
+        <i class="fas fa-cloud-download-alt"></i>
+        <span>Sincronizando dados...</span>
+    </div>
+
+    <div class="player-container" id="playerContainer">
+        <div class="empty-state">
+            <i class="fas fa-music"></i>
+            <p>Nenhum áudio disponível</p>
+            <p style="font-size: 12px; margin-top: 10px;">Clique em ⚙️ para adicionar novos áudios</p>
+        </div>
+    </div>
+
+    <!-- Modal de Configurações -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeSettings()">&times;</span>
+            <h2>⚙️ Configurações</h2>
+            <div class="settings-menu">
+                <a href="add.html" class="settings-link">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Adicionar Novo Áudio</span>
+                </a>
+                <a href="edit_remove.html" class="settings-link">
+                    <i class="fas fa-edit"></i>
+                    <span>Editar/Remover Áudios</span>
+                </a>
+                <button class="settings-link" onclick="debugSync()" style="text-align: left;">
+                    <i class="fas fa-bug"></i>
+                    <span>Debug Sincronização</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./sync-manager.js"></script>
+    <script>
+        // ===== CONSTANTES =====
+        const DEFAULT_AUDIOS = [];
+
+        // ===== STATE =====
+        let currentAudioData = { defaultAudios: DEFAULT_AUDIOS, customAudios: [] };
+        let isOnline = navigator.onLine;
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Iniciando aplicação...');
+            
+            await loadAudioData();
+            renderAllAudioCards();
+
+            setupSync();
+            registerServiceWorker();
+
+            window.addEventListener('online', () => {
+                isOnline = true;
+                updateSyncStatus();
+                showStatus('✓ Online - Sincronizando...', 'success');
+                manualSync();
+            });
+
+            window.addEventListener('offline', () => {
+                isOnline = false;
+                updateSyncStatus();
+                showStatus('⚠ Offline - Funcionando em modo local', 'warning');
+            });
+
+            updateSyncStatus();
+        });
+
+        // ===== DATA MANAGEMENT =====
+        async function loadAudioData() {
+            try {
+                if (typeof syncManager !== 'undefined') {
+                    const data = await syncManager.getAllAudios();
+                    currentAudioData.customAudios = data.customAudios || [];
+                } else {
+                    const localData = localStorage.getItem('audioData');
+                    if (localData) {
+                        const parsed = JSON.parse(localData);
+                        currentAudioData.customAudios = parsed.customAudios || [];
+                    }
+                }
+                console.log('✓ Dados carregados:', currentAudioData);
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        async function saveAudioData() {
+            try {
+                if (typeof syncManager !== 'undefined') {
+                    await syncManager.saveAudios(currentAudioData);
+                    syncManager.broadcastChange(currentAudioData);
+                } else {
+                    localStorage.setItem('audioData', JSON.stringify(currentAudioData));
+                }
+                console.log('✓ Dados salvos');
+            } catch (error) {
+                console.error('Erro ao salvar dados:', error);
+                showStatus('✗ Erro ao salvar', 'error');
+            }
+        }
+
+        // ===== SYNC SETUP =====
+        function setupSync() {
+            if (typeof syncManager === 'undefined') return;
+
+            syncManager.onDataChange(async (event) => {
+                console.log('📡 Evento de sincronização:', event.type);
+
+                if (event.type === 'sync' || event.type === 'external_change' || event.type === 'broadcast') {
+                    showRefreshIndicator();
+                    
+                    setTimeout(async () => {
+                        await loadAudioData();
+                        renderAllAudioCards();
+                        hideRefreshIndicator();
+                        
+                        if (event.type === 'broadcast') {
+                            showStatus('✓ Dados sincronizados de outro dispositivo', 'info');
+                        }
+                    }, 500);
+                }
+            });
+        }
+
+        // ===== SYNC CONTROLS =====
+        async function manualSync() {
+            if (typeof syncManager === 'undefined') return;
+
+            showRefreshIndicator();
+            const syncButton = document.querySelector('.sync-button i');
+            syncButton.style.animation = 'spin 1s linear infinite';
+
+            try {
+                const data = await syncManager.syncData();
+                if (data) {
+                    await loadAudioData();
+                    renderAllAudioCards();
+                    showStatus('✓ Sincronização concluída', 'success');
+                }
+            } catch (error) {
+                console.error('Erro ao sincronizar:', error);
+                showStatus('✗ Erro na sincronização', 'error');
+            } finally {
+                syncButton.style.animation = '';
+                hideRefreshIndicator();
+            }
+        }
+
+        function updateSyncStatus() {
+            const badge = document.getElementById('syncBadge');
+            if (!isOnline) {
+                badge.className = 'sync-badge offline';
+            } else {
+                badge.className = 'sync-badge';
+            }
+        }
+
+        function showRefreshIndicator() {
+            document.getElementById('refreshIndicator').style.display = 'flex';
+        }
+
+        function hideRefreshIndicator() {
+            document.getElementById('refreshIndicator').style.display = 'none';
+        }
+
+        // ===== RENDERING =====
+        function renderAllAudioCards() {
+            const container = document.getElementById('playerContainer');
+            container.innerHTML = '';
+
+            const allAudios = [...currentAudioData.defaultAudios, ...currentAudioData.customAudios];
+
+            if (allAudios.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-music"></i>
+                        <p>Nenhum áudio disponível</p>
+                        <p style="font-size: 12px; margin-top: 10px;">Clique em ⚙️ para adicionar novos áudios</p>
+                    </div>
+                `;
+                return;
+            }
+
+            allAudios.forEach((audio) => {
+                const card = createAudioCard(audio);
+                container.appendChild(card);
+                setupAudioCard(card);
+            });
+        }
+
+        function createAudioCard(audio) {
+            const card = document.createElement('div');
+            card.className = 'audio-card';
+            card.dataset.name = audio.name;
+            card.dataset.custom = currentAudioData.customAudios.some(a => a.name === audio.name) ? 'true' : 'false';
+
+            const isDefault = currentAudioData.defaultAudios.some(a => a.name === audio.name);
+
+            card.innerHTML = `
+                <div class="audio-header">
+                    <img src="${audio.imagePath}" alt="${audio.name}" class="audio-icon" loading="lazy" onerror="this.style.display='none'">
+                    <div class="audio-info">
+                        <div class="audio-title">${audio.name}</div>
+                        <div class="audio-source">${isDefault ? '📱 Padrão' : '✨ Personalizado'}</div>
+                    </div>
+                    ${card.dataset.custom === 'true' ? `
+                        <button class="remove-button" onclick="removeAudio('${audio.name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+                <audio class="audio-controls" controls src="${audio.audioPath}" onerror="this.style.display='none'"></audio>
+                <div class="loop-controls">
+                    <input type="number" class="time-input" placeholder="Início (seg)" min="0" step="0.1">
+                    <input type="number" class="time-input" placeholder="Fim (seg)" min="0" step="0.1">
+                    <input type="number" class="time-input" placeholder="Pausa (seg)" min="0" step="0.1">
+                    <button class="loop-button">🔁 Loop</button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        function setupAudioCard(card) {
+            const audio = card.querySelector('audio');
+            if (!audio) return;
+
+            const startInput = card.querySelector('.time-input:nth-of-type(1)');
+            const endInput = card.querySelector('.time-input:nth-of-type(2)');
+            const pauseInput = card.querySelector('.time-input:nth-of-type(3)');
+            const loopButton = card.querySelector('.loop-button');
+
+            const state = {
+                isLooping: false,
+                pauseTimeout: null,
+                isWaitingForPause: false
+            };
+
+            function handleTimeUpdate() {
+                if (state.isLooping && !state.isWaitingForPause) {
+                    const start = parseFloat(startInput.value) || 0;
+                    const end = parseFloat(endInput.value) || audio.duration;
+
+                    if (audio.currentTime >= end) {
+                        audio.pause();
+                        state.isWaitingForPause = true;
+                        const pauseDuration = (parseFloat(pauseInput.value) || 0) * 1000;
+
+                        clearTimeout(state.pauseTimeout);
+                        state.pauseTimeout = setTimeout(() => {
+                            if (state.isLooping) {
+                                state.isWaitingForPause = false;
+                                audio.currentTime = start;
+                                audio.play().catch(e => console.log('Erro ao reproduzir:', e));
+                            }
+                        }, pauseDuration);
+                    }
+                }
+            }
+
+            function handleLoopClick() {
+                state.isLooping = !state.isLooping;
+                state.isWaitingForPause = false;
+                loopButton.classList.toggle('active');
+
+                if (state.isLooping) {
+                    const start = parseFloat(startInput.value) || 0;
+                    audio.currentTime = start;
+                    audio.play().catch(e => console.log('Erro ao reproduzir:', e));
+                    loopButton.textContent = '⏹ Parar Loop';
+                } else {
+                    audio.pause();
+                    clearTimeout(state.pauseTimeout);
+                    loopButton.textContent = '🔁 Loop';
+                }
+            }
+
+            function handleMetadata() {
+                endInput.max = audio.duration;
+                startInput.max = audio.duration;
+            }
+
+            function handlePause() {
+                if (!state.isLooping) {
+                    clearTimeout(state.pauseTimeout);
+                    state.isWaitingForPause = false;
+                }
+            }
+
+            audio.addEventListener('timeupdate', handleTimeUpdate);
+            audio.addEventListener('loadedmetadata', handleMetadata);
+            audio.addEventListener('pause', handlePause);
+            loopButton.addEventListener('click', handleLoopClick);
+
+            audio.controls = true;
+        }
+
+        function filterAudios(searchTerm) {
+            const audioCards = document.querySelectorAll('.audio-card');
+            searchTerm = searchTerm.toLowerCase();
+
+            audioCards.forEach(card => {
+                const title = card.querySelector('.audio-title').textContent.toLowerCase();
+                card.style.display = title.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        async function removeAudio(audioName) {
+            if (confirm(`Tem certeza que deseja remover "${audioName}"?`)) {
+                currentAudioData.customAudios = currentAudioData.customAudios.filter(audio => audio.name !== audioName);
+                await saveAudioData();
+                renderAllAudioCards();
+                showStatus('✓ Áudio removido com sucesso!', 'success');
+            }
+        }
+
+        // ===== UI FUNCTIONS =====
+        function showStatus(message, type = 'success') {
+            const statusElement = document.createElement('div');
+            statusElement.className = `status-message ${type}`;
+            statusElement.textContent = message;
+            document.body.appendChild(statusElement);
+
+            setTimeout(() => {
+                statusElement.remove();
+            }, 3000);
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('settingsModal');
+            if (event.target == modal) {
+                closeSettings();
+            }
+        }
+
+        // ===== DEBUG =====
+        function debugSync() {
+            console.log('=== DEBUG SINCRONIZAÇÃO ===');
+            if (typeof syncManager !== 'undefined') {
+                console.log('Device ID:', syncManager.getDeviceId());
+            }
+            console.log('Online:', isOnline);
+            console.log('Áudios Atuais:', currentAudioData);
+            console.log('LocalStorage:', localStorage.getItem('audioData'));
+            alert('Verifique o console (F12) para mais detalhes');
+        }
+
+        // ===== SERVICE WORKER =====
+        function registerServiceWorker() {
+            if (!('serviceWorker' in navigator)) return;
+            
+            window.addEventListener('load', async () => {
+                const basePath = (location.pathname.endsWith('/') ? location.pathname : location.pathname.replace(/[^/]+$/, ''));
+                const swUrl = new URL('sw.js', location.origin + basePath).toString();
+                try {
+                    await navigator.serviceWorker.register(swUrl, { scope: basePath });
+                    console.log('✓ ServiceWorker registrado');
+                } catch (error) {
+                    console.warn('⚠ ServiceWorker não disponível:', error.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
