@@ -13,7 +13,8 @@ class SyncManager {
         this.listeners = [];
         this.channel = null;
         
-        this.init();
+        // Promise de inicialização para evitar condição de corrida
+        this.ready = this.init();
     }
 
     /**
@@ -27,8 +28,10 @@ class SyncManager {
             await this.migrateFromLocalStorage();
             this.startAutoSync();
             this.setupSyncListeners();
+            return true;
         } catch (error) {
             console.error('Erro ao inicializar SyncManager:', error);
+            return false;
         }
     }
 
@@ -130,6 +133,9 @@ class SyncManager {
      * Obter todos os áudios sincronizados
      */
     async getAllAudios() {
+        // Aguardar inicialização
+        await this.ready;
+
         try {
             let dbData = null;
             let localData = null;
@@ -170,6 +176,9 @@ class SyncManager {
      * Salvar áudios sincronizados
      */
     async saveAudios(audioData) {
+        // Aguardar inicialização
+        await this.ready;
+
         try {
             const hash = this.generateHash(audioData);
             const timestamp = Date.now();
