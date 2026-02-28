@@ -24,6 +24,22 @@
         .audio-info { flex: 1; }
         .audio-name { font-weight: bold; font-size: 16px; }
         .delete-btn { background: none; border: none; color: #f44336; cursor: pointer; font-size: 18px; padding: 5px; }
+        .edit-btn { background: none; border: none; color: #2196F3; cursor: pointer; font-size: 18px; padding: 5px; margin-right: 5px; }
+        
+        /* Modal de Edição */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .cancel-btn { background: #ccc; color: #333; }
+        
+        /* Área de Backup */
+        .backup-section { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        .backup-title { font-weight: bold; margin-bottom: 10px; color: #555; }
+        .backup-btn { background: #607D8B; margin-top: 10px; font-size: 14px; width: 100%; }
+        .import-btn { background: #FF9800; margin-top: 10px; font-size: 14px; width: 100%; }
     </style>
     <script src="./sync-manager.js"></script>
 </head>
@@ -33,6 +49,7 @@
         <div style="font-weight:bold">Editar/Remover Áudios</div>
         <div style="width:44px;"></div>
     </div>
+    
     <div class="container">
         <h2>Meus Áudios</h2>
         <div id="audioList">
@@ -42,6 +59,42 @@
         <button class="btn" onclick="window.location.href='add.html'">
             <i class="fas fa-plus"></i> Adicionar Novo Áudio
         </button>
+
+        <!-- Área de Backup/Restauração -->
+        <div class="backup-section">
+            <div class="backup-title">Backup e Sincronização (PC ↔ Mobile)</div>
+            <p class="hint" style="font-size: 12px;">Para passar áudios do PC para o celular, exporte aqui e importe no outro dispositivo.</p>
+            <button class="btn backup-btn" onclick="exportBackup()">
+                <i class="fas fa-download"></i> Exportar Backup (Baixar Arquivo)
+            </button>
+            <button class="btn import-btn" onclick="document.getElementById('importFile').click()">
+                <i class="fas fa-upload"></i> Importar Backup
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display: none" onchange="importBackup(this)">
+        </div>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>Editar Áudio</h3>
+            <div class="form-group">
+                <label>Nome do Áudio</label>
+                <input type="text" id="editName" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Nova Imagem (Opcional)</label>
+                <input type="file" id="editImage" accept="image/*" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Novo Áudio (Opcional)</label>
+                <input type="file" id="editAudioFile" accept="audio/*" class="form-control">
+            </div>
+            <div class="modal-actions">
+                <button class="btn cancel-btn" onclick="closeEditModal()">Cancelar</button>
+                <button class="btn" onclick="saveEdit()">Salvar</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -53,6 +106,8 @@
                 console.error('Erro ao inicializar syncManager:', e);
             }
         }
+
+        let currentEditName = null;
 
         async function loadAudios() {
             const list = document.getElementById('audioList');
@@ -80,6 +135,9 @@
                         <div class="audio-info">
                             <div class="audio-name">${audio.name}</div>
                         </div>
+                        <button class="edit-btn" onclick="openEditModal('${audio.name}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
                         <button class="delete-btn" onclick="deleteAudio('${audio.name}')">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -108,6 +166,147 @@
                 console.error('Erro ao remover:', error);
                 alert('Erro ao remover áudio.');
             }
+        }
+
+        // Funções de Edição
+        function openEditModal(name) {
+            currentEditName = name;
+            document.getElementById('editName').value = name;
+            document.getElementById('editImage').value = '';
+            document.getElementById('editAudioFile').value = '';
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditName = null;
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function saveEdit() {
+            const newName = document.getElementById('editName').value.trim();
+            const imageFile = document.getElementById('editImage').files[0];
+            const audioFile = document.getElementById('editAudioFile').files[0];
+
+            if (!newName) {
+                alert('O nome não pode ser vazio.');
+                return;
+            }
+
+            try {
+                const data = await window.syncManager.getAllAudios();
+                const audioIndex = data.customAudios.findIndex(a => a.name === currentEditName);
+
+                if (audioIndex === -1) {
+                    alert('Áudio não encontrado.');
+                    return;
+                }
+
+                // Atualizar nome
+                data.customAudios[audioIndex].name = newName;
+
+                // Atualizar imagem se houver
+                if (imageFile) {
+                    data.customAudios[audioIndex].imagePath = await fileToBase64(imageFile);
+                }
+
+                // Atualizar áudio se houver
+                if (audioFile) {
+                    data.customAudios[audioIndex].audioPath = await fileToBase64(audioFile);
+                }
+
+                await window.syncManager.saveAudios(data);
+                window.syncManager.broadcastChange(data);
+                
+                closeEditModal();
+                loadAudios();
+                alert('Áudio atualizado com sucesso!');
+
+            } catch (error) {
+                console.error('Erro ao editar:', error);
+                alert('Erro ao salvar edição: ' + error.message);
+            }
+        }
+
+        // Funções de Backup/Restore
+        async function exportBackup() {
+            try {
+                const data = await window.syncManager.getAllAudios();
+                const json = JSON.stringify(data);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup_chamariz_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Erro ao exportar:', error);
+                alert('Erro ao criar backup.');
+            }
+        }
+
+        function importBackup(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (!importedData.customAudios) {
+                        throw new Error('Formato inválido');
+                    }
+
+                    if (!confirm(`Importar ${importedData.customAudios.length} áudios? Isso substituirá a lista atual.`)) {
+                        input.value = '';
+                        return;
+                    }
+
+                    // Mesclar ou substituir? Aqui vamos substituir para garantir sync exato, ou mesclar?
+                    // Melhor mesclar para não perder o que já tem, mas o usuário pode querer substituir.
+                    // Vamos mesclar verificando nomes duplicados.
+                    
+                    const currentData = await window.syncManager.getAllAudios();
+                    const currentAudios = currentData.customAudios || [];
+                    
+                    let addedCount = 0;
+                    importedData.customAudios.forEach(newAudio => {
+                        // Verifica se já existe pelo nome
+                        const exists = currentAudios.some(a => a.name === newAudio.name);
+                        if (!exists) {
+                            currentAudios.push(newAudio);
+                            addedCount++;
+                        }
+                    });
+
+                    currentData.customAudios = currentAudios;
+                    
+                    await window.syncManager.saveAudios(currentData);
+                    window.syncManager.broadcastChange(currentData);
+                    
+                    loadAudios();
+                    alert(`Backup importado! ${addedCount} novos áudios adicionados.`);
+                    
+                } catch (error) {
+                    console.error('Erro ao importar:', error);
+                    alert('Erro ao ler arquivo de backup: ' + error.message);
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
         }
 
         // Carregar ao iniciar
