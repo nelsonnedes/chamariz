@@ -102,6 +102,8 @@ class SyncManager {
                             data: fullData,
                             timestamp: Date.now()
                         });
+
+                        this.cacheMediaFilesLocally(mergedCustom);
                     } else {
                         console.log('ℹ Documento /chamariz/audioData ainda não existe no Firestore. Criando se houver dados locais...');
                     }
@@ -238,7 +240,15 @@ class SyncManager {
             }
 
             if (dbData && dbData.data) {
-                return dbData.data;
+                const result = dbData.data;
+                if (result && result.customAudios) {
+                    result.customAudios = result.customAudios.map(item => ({
+                        ...item,
+                        audioPath: item.localAudioData || item.audioPath,
+                        imagePath: item.localImageData || item.imagePath
+                    }));
+                }
+                return result;
             }
 
             const localDataStr = localStorage.getItem('audioData');
@@ -583,6 +593,69 @@ class SyncManager {
             case 'wma': return 'audio/x-ms-wma';
             default: return 'audio/mpeg';
         }
+    }
+
+    async cacheMediaFilesLocally(customAudios) {
+        if (!navigator.onLine || !customAudios || !Array.isArray(customAudios)) return;
+
+        let hasNewLocalData = false;
+
+        for (const audio of customAudios) {
+            // Baixar e guardar áudio localmente em IndexedDB se for URL HTTP
+            if (audio.audioPath && audio.audioPath.startsWith('http') && !audio.localAudioData) {
+                try {
+                    console.log(`⬇ Baixando áudio para cache offline local: ${audio.name}`);
+                    const response = await fetch(audio.audioPath);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        audio.localAudioData = await this.blobToBase64(blob);
+                        hasNewLocalData = true;
+                    }
+                } catch (e) {
+                    console.warn(`Erro ao baixar áudio offline (${audio.name}):`, e);
+                }
+            }
+
+            // Baixar e guardar imagem localmente em IndexedDB se for URL HTTP
+            if (audio.imagePath && audio.imagePath.startsWith('http') && !audio.localImageData) {
+                try {
+                    console.log(`⬇ Baixando imagem para cache offline local: ${audio.name}`);
+                    const response = await fetch(audio.imagePath);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        audio.localImageData = await this.blobToBase64(blob);
+                        hasNewLocalData = true;
+                    }
+                } catch (e) {
+                    console.warn(`Erro ao baixar imagem offline (${audio.name}):`, e);
+                }
+            }
+        }
+
+        if (hasNewLocalData) {
+            const fullData = { customAudios, defaultAudios: [] };
+            await this.saveToIndexedDB({
+                id: 'audioData',
+                data: fullData,
+                timestamp: Date.now(),
+                source: 'local_media_cached'
+            });
+            console.log('✓ Mídias salvas localmente no IndexedDB para uso 100% offline no celular!');
+            this.notifyListeners({
+                type: 'cloud_sync',
+                data: fullData,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     }
 
     fileToBase64(file) {

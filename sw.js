@@ -1,11 +1,11 @@
 /**
  * SERVICE WORKER - Chamariz
- * Cache-first strategy para assets estáticos
- * Network-first para dados dinâmicos
+ * Cache-first para assets estáticos e mídias (áudio/imagens/Firebase Storage)
+ * Suporte a modo 100% offline no celular
  */
 
-const CACHE_NAME = 'chamariz-v2';
-const RUNTIME_CACHE = 'chamariz-runtime-v2';
+const CACHE_NAME = 'chamariz-v3';
+const RUNTIME_CACHE = 'chamariz-runtime-v3';
 
 // Assets para cachear na instalação
 const PRECACHE_URLS = [
@@ -20,7 +20,7 @@ const PRECACHE_URLS = [
 
 // ===== INSTALL EVENT =====
 self.addEventListener('install', event => {
-    console.log('🔧 Service Worker instalando...');
+    console.log('🔧 Service Worker instalando (v3)...');
     
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -30,7 +30,6 @@ self.addEventListener('install', event => {
             })
             .catch(error => {
                 console.warn('⚠ Erro ao cachear assets:', error);
-                // Continuar mesmo se falhar
             })
     );
     
@@ -62,12 +61,49 @@ self.addEventListener('fetch', event => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Ignorar requisições de extensões do navegador
+    // Ignorar requisições não HTTP/HTTPS
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
         return;
     }
 
-    // Estratégia para arquivos estáticos (CSS, JS, Font)
+    // 1. Estratégia Cache-First especial para Mídias e Firebase Storage (Áudios e Fotos)
+    if (request.method === 'GET' && 
+        (url.hostname.includes('firebasestorage.googleapis.com') ||
+         url.hostname.includes('storage.googleapis.com') ||
+         request.destination === 'image' || 
+         request.destination === 'audio' ||
+         url.pathname.includes('.mp3') ||
+         url.pathname.includes('.m4a') ||
+         url.pathname.includes('.png') ||
+         url.pathname.includes('.jpg') ||
+         url.pathname.includes('.webp'))) {
+        
+        event.respondWith(
+            caches.match(request, { ignoreSearch: false }).then(cachedResponse => {
+                if (cachedResponse) {
+                    console.log('⚡ Mídia servida do Cache SW:', url.pathname);
+                    return cachedResponse;
+                }
+                
+                return fetch(request).then(networkResponse => {
+                    // Salvar no cache se for resposta válida (200) ou resposta CORS opaca (status 0)
+                    if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+                        const responseToCache = networkResponse.clone();
+                        caches.open(RUNTIME_CACHE).then(cache => {
+                            cache.put(request, responseToCache);
+                        });
+                    }
+                    return networkResponse;
+                }).catch(err => {
+                    console.warn('⚠ Dispositivo offline - buscando fallback para mídia:', url.pathname);
+                    return caches.match(request, { ignoreSearch: true });
+                });
+            })
+        );
+        return;
+    }
+
+    // 2. Estratégia para arquivos estáticos (CSS, JS, Fontes)
     if (request.method === 'GET' && 
         (url.pathname.includes('.css') || 
          url.pathname.includes('.js') || 
@@ -83,19 +119,14 @@ self.addEventListener('fetch', event => {
                     }
                     
                     return fetch(request).then(response => {
-                        if (!response || response.status !== 200) {
-                            return response;
-                        }
-                        
-                        const responseToCache = response.clone();
-                        caches.open(RUNTIME_CACHE)
-                            .then(cache => {
+                        if (response && (response.status === 200 || response.type === 'opaque')) {
+                            const responseToCache = response.clone();
+                            caches.open(RUNTIME_CACHE).then(cache => {
                                 cache.put(request, responseToCache);
                             });
-                        
+                        }
                         return response;
                     }).catch(error => {
-                        console.warn('⚠ Erro ao buscar:', url.pathname, error);
                         return new Response('Offline', { status: 503 });
                     });
                 })
@@ -103,88 +134,54 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Estratégia Network-First para HTML (sempre tentar rede primeiro)
-    if (request.method === 'GET' && url.pathname.endsWith('.html')) {
+    // 3. Estratégia Network-First para páginas HTML (Tenta rede, fallback para cache offline)
+    if (request.method === 'GET' && (url.pathname.endsWith('.html') || url.pathname === '/')) {
         event.respondWith(
             fetch(request)
                 .then(response => {
                     if (response && response.status === 200) {
                         const responseToCache = response.clone();
-                        caches.open(RUNTIME_CACHE)
-                            .then(cache => {
-                                cache.put(request, responseToCache);
-                            });
+                        caches.open(RUNTIME_CACHE).then(cache => {
+                            cache.put(request, responseToCache);
+                        });
                         return response;
                     }
                     return response;
                 })
                 .catch(error => {
-                    // Se falhar, tentar cache
-                    return caches.match(request)
-                        .then(response => {
-                            if (response) {
-                                return response;
-                            }
-                            return new Response('Offline', { status: 503 });
-                        });
+                    return caches.match(request).then(response => {
+                        if (response) {
+                            return response;
+                        }
+                        return caches.match('./index.html');
+                    });
                 })
         );
         return;
     }
 
-    // Para outras requisições GET, Cache-First com fallback para network
+    // 4. Para outras requisições GET
     if (request.method === 'GET') {
         event.respondWith(
-            caches.match(request)
-                .then(response => {
-                    if (response) {
-                        return response;
+            caches.match(request).then(response => {
+                if (response) return response;
+                return fetch(request).then(res => {
+                    if (res && (res.status === 200 || res.type === 'opaque')) {
+                        const resCache = res.clone();
+                        caches.open(RUNTIME_CACHE).then(cache => cache.put(request, resCache));
                     }
-                    
-                    return fetch(request)
-                        .then(response => {
-                            if (!response || response.status !== 200) {
-                                return response;
-                            }
-                            
-                            const responseToCache = response.clone();
-                            caches.open(RUNTIME_CACHE)
-                                .then(cache => {
-                                    cache.put(request, responseToCache);
-                                });
-                            
-                            return response;
-                        })
-                        .catch(error => {
-                            console.warn('⚠ Erro offline:', url.pathname);
-                            // Retornar placeholders para diferentes tipos
-                            if (request.destination === 'image') {
-                                return new Response(
-                                    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="50" fill="#ddd"/></svg>',
-                                    { 
-                                        headers: { 'Content-Type': 'image/svg+xml' },
-                                        status: 200
-                                    }
-                                );
-                            }
-                            if (request.destination === 'audio') {
-                                return new Response(null, { status: 204 });
-                            }
-                            return new Response('Offline', { status: 503 });
-                        });
-                })
+                    return res;
+                });
+            })
         );
         return;
     }
 
-    // Para outras requisições, deixar passar
     event.respondWith(fetch(request));
 });
 
-// ===== MESSAGE EVENT (para comunicação com páginas) =====
+// ===== MESSAGE EVENT =====
 self.addEventListener('message', event => {
-    console.log('📨 Mensagem recebida no SW:', event.data);
-    
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
