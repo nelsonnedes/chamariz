@@ -4,8 +4,8 @@
  * Network-first para dados dinâmicos
  */
 
-const CACHE_NAME = 'chamariz-v1';
-const RUNTIME_CACHE = 'chamariz-runtime-v1';
+const CACHE_NAME = 'chamariz-v2';
+const RUNTIME_CACHE = 'chamariz-runtime-v2';
 
 // Assets para cachear na instalação
 const PRECACHE_URLS = [
@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
     './add.html',
     './edit_remove.html',
     './manifest.json',
+    './firebase-config.js',
     './sync-manager.js',
     './css/all.min.css'
 ];

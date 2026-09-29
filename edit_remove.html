@@ -41,6 +41,10 @@
         .backup-btn { background: #607D8B; margin-top: 10px; font-size: 14px; width: 100%; }
         .import-btn { background: #FF9800; margin-top: 10px; font-size: 14px; width: 100%; }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="./firebase-config.js"></script>
     <script src="./sync-manager.js"></script>
 </head>
 <body>
@@ -62,8 +66,8 @@
 
         <!-- Área de Backup/Restauração -->
         <div class="backup-section">
-            <div class="backup-title">Backup e Sincronização (PC ↔ Mobile)</div>
-            <p class="hint" style="font-size: 12px;">Para passar áudios do PC para o celular, exporte aqui e importe no outro dispositivo.</p>
+            <div class="backup-title">Backup e Sincronização</div>
+            <p class="hint" style="font-size: 12px;">Exportar/Importar backup manual via JSON se necessário.</p>
             <button class="btn backup-btn" onclick="exportBackup()">
                 <i class="fas fa-download"></i> Exportar Backup (Baixar Arquivo)
             </button>
@@ -107,7 +111,7 @@
             }
         }
 
-        let currentEditName = null;
+        let currentEditId = null;
 
         async function loadAudios() {
             const list = document.getElementById('audioList');
@@ -130,15 +134,17 @@
                 customAudios.forEach(audio => {
                     const item = document.createElement('div');
                     item.className = 'audio-item';
+                    const audioIdOrName = audio.id || audio.name;
                     item.innerHTML = `
                         <img src="${audio.imagePath}" alt="${audio.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23ddd%22/><text x=%2250%22 y=%2250%22 dy=%22.35em%22 text-anchor=%22middle%22 font-size=%2240%22>🎵</text></svg>'">
                         <div class="audio-info">
                             <div class="audio-name">${audio.name}</div>
+                            <div style="font-size:11px; color:#888;">${audio.audioStoragePath ? '☁️ Nuvem' : '📱 Local'}</div>
                         </div>
-                        <button class="edit-btn" onclick="openEditModal('${audio.name}')">
+                        <button class="edit-btn" onclick="openEditModal('${audioIdOrName}', '${audio.name.replace(/'/g, "\\'")}')">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="delete-btn" onclick="deleteAudio('${audio.name}')">
+                        <button class="delete-btn" onclick="deleteAudio('${audioIdOrName}', '${audio.name.replace(/'/g, "\\'")}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     `;
@@ -151,17 +157,13 @@
             }
         }
 
-        async function deleteAudio(name) {
+        async function deleteAudio(idOrName, name) {
             if (!confirm(`Tem certeza que deseja remover "${name}"?`)) return;
 
             try {
-                const data = await window.syncManager.getAllAudios();
-                if (data.customAudios) {
-                    data.customAudios = data.customAudios.filter(a => a.name !== name);
-                    await window.syncManager.saveAudios(data);
-                    window.syncManager.broadcastChange(data);
-                    loadAudios(); // Recarregar lista
-                }
+                await window.syncManager.removeAudio(idOrName);
+                await loadAudios();
+                alert('Áudio removido com sucesso!');
             } catch (error) {
                 console.error('Erro ao remover:', error);
                 alert('Erro ao remover áudio.');
@@ -169,8 +171,8 @@
         }
 
         // Funções de Edição
-        function openEditModal(name) {
-            currentEditName = name;
+        function openEditModal(idOrName, name) {
+            currentEditId = idOrName;
             document.getElementById('editName').value = name;
             document.getElementById('editImage').value = '';
             document.getElementById('editAudioFile').value = '';
@@ -179,16 +181,7 @@
 
         function closeEditModal() {
             document.getElementById('editModal').style.display = 'none';
-            currentEditName = null;
-        }
-
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
-                reader.readAsDataURL(file);
-            });
+            currentEditId = null;
         }
 
         async function saveEdit() {
@@ -202,34 +195,10 @@
             }
 
             try {
-                const data = await window.syncManager.getAllAudios();
-                const audioIndex = data.customAudios.findIndex(a => a.name === currentEditName);
-
-                if (audioIndex === -1) {
-                    alert('Áudio não encontrado.');
-                    return;
-                }
-
-                // Atualizar nome
-                data.customAudios[audioIndex].name = newName;
-
-                // Atualizar imagem se houver
-                if (imageFile) {
-                    data.customAudios[audioIndex].imagePath = await fileToBase64(imageFile);
-                }
-
-                // Atualizar áudio se houver
-                if (audioFile) {
-                    data.customAudios[audioIndex].audioPath = await fileToBase64(audioFile);
-                }
-
-                await window.syncManager.saveAudios(data);
-                window.syncManager.broadcastChange(data);
-                
+                await window.syncManager.updateAudio(currentEditId, newName, audioFile, imageFile);
                 closeEditModal();
-                loadAudios();
+                await loadAudios();
                 alert('Áudio atualizado com sucesso!');
-
             } catch (error) {
                 console.error('Erro ao editar:', error);
                 alert('Erro ao salvar edição: ' + error.message);
@@ -270,21 +239,16 @@
                         throw new Error('Formato inválido');
                     }
 
-                    if (!confirm(`Importar ${importedData.customAudios.length} áudios? Isso substituirá a lista atual.`)) {
+                    if (!confirm(`Importar ${importedData.customAudios.length} áudios? Isso mesclará com a lista atual.`)) {
                         input.value = '';
                         return;
                     }
-
-                    // Mesclar ou substituir? Aqui vamos substituir para garantir sync exato, ou mesclar?
-                    // Melhor mesclar para não perder o que já tem, mas o usuário pode querer substituir.
-                    // Vamos mesclar verificando nomes duplicados.
                     
                     const currentData = await window.syncManager.getAllAudios();
                     const currentAudios = currentData.customAudios || [];
                     
                     let addedCount = 0;
                     importedData.customAudios.forEach(newAudio => {
-                        // Verifica se já existe pelo nome
                         const exists = currentAudios.some(a => a.name === newAudio.name);
                         if (!exists) {
                             currentAudios.push(newAudio);
@@ -309,8 +273,13 @@
             reader.readAsText(file);
         }
 
-        // Carregar ao iniciar
-        document.addEventListener('DOMContentLoaded', loadAudios);
+        // Carregar ao iniciar e escutar mudanças do Firebase
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAudios();
+            if (window.syncManager) {
+                window.syncManager.onDataChange(() => loadAudios());
+            }
+        });
     </script>
 </body>
 </html>

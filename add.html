@@ -291,6 +291,10 @@
         </button>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="./firebase-config.js"></script>
     <script src="./sync-manager.js"></script>
     <script>
         if (typeof window.syncManager === 'undefined') {
@@ -338,15 +342,6 @@
             setTimeout(() => elem.classList.remove('active'), 4000);
         }
 
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
-                reader.readAsDataURL(file);
-            });
-        }
-
         async function addNewAudio() {
             if (!newAudioFile || !newImageFile) {
                 showStatus('Selecione áudio e imagem', 'error');
@@ -355,19 +350,13 @@
 
             const btn = document.getElementById('addButton');
             btn.disabled = true;
-            btn.innerHTML = '<div class="loading-spinner"></div> Processando...';
+            btn.innerHTML = '<div class="loading-spinner"></div> Enviando...';
 
             try {
-                showStatus('Convertendo para Base64...', 'info');
-
-                const audioBase64 = await fileToBase64(newAudioFile);
-                const imageBase64 = await fileToBase64(newImageFile);
                 const audioName = newAudioFile.name.replace(/\.[^/.]+$/, "");
 
-                // Carregar dados atuais do syncManager
+                // Verificar duplicatas nos dados atuais
                 const audioData = await window.syncManager.getAllAudios();
-
-                // Verificar duplicatas
                 const allAudios = [...(audioData.defaultAudios || []), ...(audioData.customAudios || [])];
                 if (allAudios.some(a => a.name === audioName)) {
                     showStatus('✗ Áudio com esse nome já existe!', 'error');
@@ -376,18 +365,16 @@
                     return;
                 }
 
-                audioData.customAudios = audioData.customAudios || [];
-                audioData.customAudios.push({
-                    name: audioName,
-                    audioPath: audioBase64,
-                    imagePath: imageBase64
-                });
+                if (window.isFirebaseInitialized) {
+                    showStatus('Enviando para a Nuvem (Firebase Storage)...', 'info');
+                } else {
+                    showStatus('Processando arquivo localmente...', 'info');
+                }
 
-                // Salvar via syncManager
-                await window.syncManager.saveAudios(audioData);
-                window.syncManager.broadcastChange(audioData);
+                // Adicionar via SyncManager (Firebase Storage + Firestore ou Local Base64)
+                await window.syncManager.addAudio(audioName, newAudioFile, newImageFile);
 
-                showStatus('✓ Áudio adicionado! Sincronizando...', 'success');
+                showStatus('✓ Áudio adicionado e sincronizado!', 'success');
                 setTimeout(() => window.location.href = 'index.html', 1500);
 
             } catch (error) {
