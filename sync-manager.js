@@ -83,10 +83,10 @@ class SyncManager {
                         const customAudiosDoc = cloudData.customAudios || cloudData.audios || [];
                         const defaultAudiosDoc = cloudData.defaultAudios || [];
 
-                        // Carregar itens individuais da coleção 'audios' se houver
+                        // Carregar itens da coleção 'audios' se houver
                         const collAudios = await this.fetchAudiosCollection();
                         
-                        // Mesclar sem duplicatas
+                        // Mesclar sem duplicatas e garantir normalização
                         const mergedCustom = this.mergeAudioLists(customAudiosDoc, collAudios);
                         const fullData = { customAudios: mergedCustom, defaultAudios: defaultAudiosDoc };
 
@@ -102,10 +102,8 @@ class SyncManager {
                             data: fullData,
                             timestamp: Date.now()
                         });
-
-                        this.cacheMediaFilesLocally(mergedCustom);
                     } else {
-                        console.log('ℹ Documento /chamariz/audioData ainda não existe no Firestore. Criando se houver dados locais...');
+                        console.log('ℹ Documento /chamariz/audioData não encontrado. Aguardando...');
                     }
                 }, (error) => {
                     console.warn('⚠ Erro no listener do Firestore (/chamariz/audioData):', error);
@@ -158,9 +156,19 @@ class SyncManager {
 
     mergeAudioLists(list1, list2) {
         const map = new Map();
-        [...list1, ...list2].forEach(item => {
-            const key = item.id || item.name;
-            if (key) map.set(key, item);
+        const combine = [...(list1 || []), ...(list2 || [])];
+        combine.forEach((item, idx) => {
+            if (!item || typeof item !== 'object') return;
+            const key = item.id || item.name || ('audio_' + idx);
+            map.set(key, {
+                id: item.id || key,
+                name: item.name || 'Áudio Sem Nome',
+                audioPath: item.audioPath || '',
+                imagePath: item.imagePath || '',
+                audioStoragePath: item.audioStoragePath || '',
+                imageStoragePath: item.imageStoragePath || '',
+                timestamp: item.timestamp || Date.now()
+            });
         });
         return Array.from(map.values());
     }
@@ -239,21 +247,16 @@ class SyncManager {
                 console.warn('⚠ Erro ao carregar do IndexedDB:', error);
             }
 
-            if (dbData && dbData.data) {
-                const result = dbData.data;
-                if (result && result.customAudios) {
-                    result.customAudios = result.customAudios.map(item => ({
-                        ...item,
-                        audioPath: item.localAudioData || item.audioPath,
-                        imagePath: item.localImageData || item.imagePath
-                    }));
-                }
-                return result;
+            if (dbData && dbData.data && dbData.data.customAudios && dbData.data.customAudios.length > 0) {
+                return dbData.data;
             }
 
             const localDataStr = localStorage.getItem('audioData');
             if (localDataStr) {
-                return JSON.parse(localDataStr);
+                const parsed = JSON.parse(localDataStr);
+                if (parsed.customAudios && parsed.customAudios.length > 0) {
+                    return parsed;
+                }
             }
 
             return { defaultAudios: [], customAudios: [] };
@@ -276,11 +279,9 @@ class SyncManager {
         let audioStoragePath = '';
         let imageStoragePath = '';
 
-        // Se o Firebase estiver ativo e configurado:
         if (typeof window.storage !== 'undefined' && window.storage && window.isFirebaseInitialized && navigator.onLine) {
             console.log('☁ Fazendo upload dos arquivos para o Firebase Storage...');
             
-            // Upload do Áudio com Metadata adequado (MPEG-4, M4A, AAC, etc)
             const audioExt = audioFile.name.split('.').pop();
             audioStoragePath = `audios/${id}.${audioExt}`;
             const audioRef = window.storage.ref().child(audioStoragePath);
@@ -288,7 +289,6 @@ class SyncManager {
             await audioRef.put(audioFile, { contentType: audioContentType });
             audioUrl = await audioRef.getDownloadURL();
 
-            // Upload da Imagem
             const imageExt = imageFile.name.split('.').pop();
             imageStoragePath = `images/${id}.${imageExt}`;
             const imageRef = window.storage.ref().child(imageStoragePath);
@@ -305,14 +305,11 @@ class SyncManager {
                 timestamp
             };
 
-            // 1. Salvar no documento principal /chamariz/audioData
             const currentData = await this.getAllAudios();
             currentData.customAudios = currentData.customAudios || [];
             currentData.customAudios.push(audioItem);
 
             await window.db.collection('chamariz').doc('audioData').set(currentData, { merge: true });
-
-            // 2. Salvar também na coleção /audios/{id}
             await window.db.collection('audios').doc(id).set(audioItem);
 
             await this.saveAudios(currentData);
@@ -320,7 +317,6 @@ class SyncManager {
             return audioItem;
 
         } else {
-            // Fallback Local (Base64)
             console.warn('⚠ Firebase offline. Salvando localmente.');
             const audioBase64 = await this.fileToBase64(audioFile);
             const imageBase64 = await this.fileToBase64(imageFile);
@@ -355,17 +351,14 @@ class SyncManager {
         if (typeof window.db !== 'undefined' && window.db && window.isFirebaseInitialized && navigator.onLine) {
             console.log('☁ Deletando áudio do Firebase...');
             try {
-                // Atualizar o documento principal /chamariz/audioData
                 const updatedCustom = customAudios.filter(a => a.id !== audioIdOrName && a.name !== audioIdOrName);
                 currentData.customAudios = updatedCustom;
                 await window.db.collection('chamariz').doc('audioData').set(currentData, { merge: true });
 
-                // Deletar da coleção /audios se existir ID
                 if (target && target.id) {
                     await window.db.collection('audios').doc(target.id).delete().catch(e => {});
                 }
 
-                // Deletar arquivos do Storage se existirem
                 if (target) {
                     if (target.audioStoragePath) {
                         await window.storage.ref().child(target.audioStoragePath).delete().catch(e => {});
@@ -380,7 +373,6 @@ class SyncManager {
             }
         }
 
-        // Remover do cache local
         currentData.customAudios = customAudios.filter(a => a.id !== audioIdOrName && a.name !== audioIdOrName);
         await this.saveAudios(currentData);
         this.broadcastChange(currentData);
@@ -434,7 +426,6 @@ class SyncManager {
             }
 
         } else {
-            // Atualização Local
             target.name = newName;
             if (newAudioFile) target.audioPath = await this.fileToBase64(newAudioFile);
             if (newImageFile) target.imagePath = await this.fileToBase64(newImageFile);
@@ -502,12 +493,12 @@ class SyncManager {
                 
                 if (docSnap.exists) {
                     const data = docSnap.data();
-                    cloudData.customAudios = data.customAudios || data.audios || [];
-                    cloudData.defaultAudios = data.defaultAudios || [];
+                    const customAudiosDoc = data.customAudios || data.audios || [];
+                    const defaultAudiosDoc = data.defaultAudios || [];
+                    const collAudios = await this.fetchAudiosCollection();
+                    cloudData.customAudios = this.mergeAudioLists(customAudiosDoc, collAudios);
+                    cloudData.defaultAudios = defaultAudiosDoc;
                 }
-
-                const collAudios = await this.fetchAudiosCollection();
-                cloudData.customAudios = this.mergeAudioLists(cloudData.customAudios, collAudios);
 
                 await this.saveToIndexedDB({
                     id: 'audioData',
@@ -593,69 +584,6 @@ class SyncManager {
             case 'wma': return 'audio/x-ms-wma';
             default: return 'audio/mpeg';
         }
-    }
-
-    async cacheMediaFilesLocally(customAudios) {
-        if (!navigator.onLine || !customAudios || !Array.isArray(customAudios)) return;
-
-        let hasNewLocalData = false;
-
-        for (const audio of customAudios) {
-            // Baixar e guardar áudio localmente em IndexedDB se for URL HTTP
-            if (audio.audioPath && audio.audioPath.startsWith('http') && !audio.localAudioData) {
-                try {
-                    console.log(`⬇ Baixando áudio para cache offline local: ${audio.name}`);
-                    const response = await fetch(audio.audioPath);
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        audio.localAudioData = await this.blobToBase64(blob);
-                        hasNewLocalData = true;
-                    }
-                } catch (e) {
-                    console.warn(`Erro ao baixar áudio offline (${audio.name}):`, e);
-                }
-            }
-
-            // Baixar e guardar imagem localmente em IndexedDB se for URL HTTP
-            if (audio.imagePath && audio.imagePath.startsWith('http') && !audio.localImageData) {
-                try {
-                    console.log(`⬇ Baixando imagem para cache offline local: ${audio.name}`);
-                    const response = await fetch(audio.imagePath);
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        audio.localImageData = await this.blobToBase64(blob);
-                        hasNewLocalData = true;
-                    }
-                } catch (e) {
-                    console.warn(`Erro ao baixar imagem offline (${audio.name}):`, e);
-                }
-            }
-        }
-
-        if (hasNewLocalData) {
-            const fullData = { customAudios, defaultAudios: [] };
-            await this.saveToIndexedDB({
-                id: 'audioData',
-                data: fullData,
-                timestamp: Date.now(),
-                source: 'local_media_cached'
-            });
-            console.log('✓ Mídias salvas localmente no IndexedDB para uso 100% offline no celular!');
-            this.notifyListeners({
-                type: 'cloud_sync',
-                data: fullData,
-                timestamp: Date.now()
-            });
-        }
-    }
-
-    blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
     }
 
     fileToBase64(file) {
