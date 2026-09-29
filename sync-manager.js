@@ -270,11 +270,12 @@ class SyncManager {
         if (typeof window.storage !== 'undefined' && window.storage && window.isFirebaseInitialized && navigator.onLine) {
             console.log('☁ Fazendo upload dos arquivos para o Firebase Storage...');
             
-            // Upload do Áudio
+            // Upload do Áudio com Metadata adequado (MPEG-4, M4A, AAC, etc)
             const audioExt = audioFile.name.split('.').pop();
             audioStoragePath = `audios/${id}.${audioExt}`;
             const audioRef = window.storage.ref().child(audioStoragePath);
-            await audioRef.put(audioFile);
+            const audioContentType = this.getAudioContentType(audioFile.name, audioFile.type);
+            await audioRef.put(audioFile, { contentType: audioContentType });
             audioUrl = await audioRef.getDownloadURL();
 
             // Upload da Imagem
@@ -560,6 +561,28 @@ class SyncManager {
         this.listeners.forEach(callback => {
             try { callback(event); } catch (error) { console.error('Erro no listener:', error); }
         });
+    }
+
+    getAudioContentType(filename, fileType) {
+        if (fileType && (fileType.startsWith('audio/') || fileType === 'video/mp4')) {
+            return fileType === 'video/mp4' ? 'audio/mp4' : fileType;
+        }
+        const ext = (filename || '').split('.').pop().toLowerCase();
+        switch (ext) {
+            case 'm4a':
+            case 'mp4':
+            case 'm4r': return 'audio/mp4';
+            case 'aac': return 'audio/aac';
+            case 'mp3': return 'audio/mpeg';
+            case 'wav': return 'audio/wav';
+            case 'ogg': return 'audio/ogg';
+            case 'webm': return 'audio/webm';
+            case 'flac': return 'audio/flac';
+            case '3gp': return 'audio/3gpp';
+            case 'amr': return 'audio/amr';
+            case 'wma': return 'audio/x-ms-wma';
+            default: return 'audio/mpeg';
+        }
     }
 
     fileToBase64(file) {
